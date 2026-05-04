@@ -1,0 +1,16 @@
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import { LoadingProvider } from "./context/LoadingContext";
+import './index.css'
+
+// 👇 Inter font imports (IMPORTANT)
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <LoadingProvider>
+    <App />
+  </LoadingProvider>
+  </React.StrictMode>
+)

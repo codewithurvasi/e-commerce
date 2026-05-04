@@ -1,0 +1,235 @@
+/* ===============================
+   GOOGLE FONTS
+   =============================== */
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&display=swap");
+
+/* ===============================
+   TAILWIND
+   =============================== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===============================
+   THEME TOKENS
+   colors SAME rakhe hain
+   =============================== */
+:root {
+  /* Original colors */
+  --theme-bg: #151512;
+  --theme-soft: #FBF6EA;
+  --theme-card: #FFFFFF;
+  --theme-dark: #151512;
+  --theme-text: #151512;
+  --theme-primary: #D4AF37;
+  --theme-accent: #8A6A2F;
+  --theme-muted: #594724;
+  --theme-border: rgba(212, 175, 55, 0.25);
+
+  /* Purpose-based tokens */
+  --page-bg: var(--theme-soft);
+  --section-bg: var(--theme-soft);
+  --card-bg: var(--theme-card);
+  --dark-bg: var(--theme-dark);
+
+  --text-main: var(--theme-text);
+  --text-muted: var(--theme-muted);
+  --text-accent: var(--theme-accent);
+
+  --primary: var(--theme-primary);
+  --primary-hover: #C49D2E;
+
+  --border-soft: var(--theme-border);
+  --border-gold: rgba(212, 175, 55, 0.35);
+
+  --button-bg: var(--theme-primary);
+  --button-text: var(--theme-dark);
+  --button-hover: #C49D2E;
+
+  --badge-bg: var(--theme-dark);
+  --badge-text: var(--theme-primary);
+
+  --input-bg: #FFFDF8;
+  --input-border: #DFC791;
+
+  --hover-soft: #F7EDD9;
+
+  /* Fonts */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: "Playfair Display", serif;
+}
+
+/* ===============================
+   HEIGHT FIX
+   =============================== */
+html,
+body,
+#root {
+  min-height: 100%;
+   overscroll-behavior: none;
+}
+
+/* ===============================
+   GLOBAL
+   =============================== */
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--page-bg);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+ 
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--dark-bg);
+}
+
+/* ===============================
+   UTILITIES
+   =============================== */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar,
+  .hide-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar,
+  .hide-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+}
+
+/* ===============================
+   REUSABLE COMPONENT CLASSES
+   =============================== */
+@layer components {
+  .theme-page {
+    background-color: var(--page-bg);
+    color: var(--text-main);
+  }
+
+  .theme-section {
+    background-color: var(--section-bg);
+    color: var(--text-main);
+  }
+
+  .theme-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    color: var(--text-main);
+  }
+
+  .theme-dark {
+    background-color: var(--dark-bg);
+    color: var(--primary);
+  }
+
+  .theme-btn {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    transition: all 0.3s ease;
+  }
+
+  .theme-btn:hover {
+    background-color: var(--button-hover);
+  }
+
+  .theme-btn-dark {
+    background-color: var(--dark-bg);
+    color: var(--primary);
+    transition: all 0.3s ease;
+  }
+
+  .theme-btn-dark:hover {
+    background-color: var(--primary);
+    color: var(--dark-bg);
+  }
+
+  .theme-badge {
+    background-color: var(--badge-bg);
+    color: var(--badge-text);
+  }
+
+  .theme-input {
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-main);
+  }
+
+  .theme-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.25);
+  }
+
+  .theme-hover {
+    transition: all 0.3s ease;
+  }
+
+  .theme-hover:hover {
+    background-color: var(--hover-soft);
+    color: var(--primary);
+  }
+
+  .gradient-btn {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(21, 21, 18, 0.12);
+    border-radius: 0.5rem;
+    font-weight: 600;
+  }
+
+  .gradient-btn:hover {
+    background-color: var(--button-hover);
+    box-shadow: 0 8px 20px rgba(21, 21, 18, 0.18);
+  }
+
+  .glass-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 4px 14px rgba(21, 21, 18, 0.08);
+    transition: all 0.4s ease;
+  }
+
+  .glass-card:hover {
+    border-color: var(--border-gold);
+    box-shadow: 0 14px 30px rgba(21, 21, 18, 0.14);
+  }
+}
+
+/* ===============================
+   CATEGORY AUTO SLIDER
+   =============================== */
+@keyframes category-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.category-wrapper {
+  overflow: hidden;
+}
+
+.category-slider {
+  display: flex;
+  width: max-content;
+  animation: category-scroll 25s linear infinite;
+  will-change: transform;
+}
+
+.category-wrapper:hover .category-slider {
+  animation-play-state: paused;
+}
