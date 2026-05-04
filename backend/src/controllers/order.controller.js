@@ -31,7 +31,6 @@ export const createOrder = async (req, res) => {
       paymentMode,
       items: selectedItems,
       shipping = 0,
-      discount = 0,
       couponCode = null,
     } = req.body;
 
@@ -40,42 +39,32 @@ export const createOrder = async (req, res) => {
       (customer && (customer._id || customer.id)) ||
       null;
 
-    console.log("🛒 createOrder called with:", {
-      userId,
-      paymentMode,
-      shipping,
-      couponCode,
-      selectedItemsCount: selectedItems?.length,
-    });
-
     if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
       await session.abortTransaction();
-      return res
-        .status(400)
-        .json({ success: false, message: "No items selected" });
+      return res.status(400).json({ success: false, message: "No items selected" });
     }
 
     const items = [];
 
-    // ✅ Step 1 — Process items
+    // =========================
+    // ✅ Step 1: Process items
+    // =========================
     for (const i of selectedItems) {
       const productId = i.product?._id || i.product;
       const product = await Product.findById(productId).session(session);
-      if (!product) throw new Error("Invalid product in order");
+      if (!product) throw new Error("Invalid product");
 
       let finalPrice = i.price ?? product.price;
       let variantSnapshot = null;
 
       if (i.variantId) {
         const variant = product.variants.id(i.variantId);
-        if (!variant)
-          throw new Error(`Invalid variant for ${product.title}`);
+        if (!variant) throw new Error(`Invalid variant for ${product.title}`);
 
         finalPrice = i.price ?? variant.price;
         variantSnapshot = { ...variant.toObject(), price: finalPrice };
       }
 
-      // Stock check
       if (i.quantity > getItemStock(product, i.variantId)) {
         throw new Error(`Insufficient stock for ${product.title}`);
       }
@@ -83,85 +72,95 @@ export const createOrder = async (req, res) => {
       // Deduct stock
       if (i.variantId) product.variants.id(i.variantId).stock -= i.quantity;
       else product.stock -= i.quantity;
-      product.sold += i.quantity;
 
+      product.sold += i.quantity;
       await product.save({ session });
 
       items.push({
         product: product._id,
         variantId: i.variantId || null,
         variant: variantSnapshot,
-        title: product.title || product.name,
+        title: product.title,
         price: finalPrice,
         quantity: Number(i.quantity),
         subtotal: finalPrice * Number(i.quantity),
       });
     }
 
-    // ✅ Step 2 — Totals
-    const grossTotal =
-      items.reduce((sum, i) => sum + i.subtotal, 0) + Number(shipping);
+    // =========================
+    // ✅ Step 2: Calculate totals
+    // =========================
+    const cartTotal = items.reduce((sum, i) => sum + i.subtotal, 0);
+    const grossTotal = cartTotal + Number(shipping);
 
     let appliedDiscount = 0;
     let appliedCoupon = null;
     let couponDoc = null;
 
-    // ✅ Step 3 — First order auto welcome coupon
-    let previousOrders = 0;
-    if (userId) {
-      previousOrders = await Order.countDocuments({ user: userId });
-    }
-
-    const isFirstOrder = previousOrders === 0;
-    console.log("✅ First order:", isFirstOrder);
-
-    if (isFirstOrder && !couponCode) {
-      couponDoc = await Coupon.findOne({
-        code: "WELCOME50",
-        isActive: true,
-      }).session(session);
-
-      if (couponDoc) {
-        appliedDiscount = couponDoc.discountValue;
-        appliedCoupon = couponDoc.code;
-        console.log("🎉 Welcome Coupon auto-applied:", appliedCoupon);
-      }
-    }
-
-    // ✅ Step 4 — Manual coupon overrides welcome coupon
+    // =========================
+    // ✅ Step 3: Apply coupon
+    // =========================
     if (couponCode) {
       couponDoc = await Coupon.findOne({
-        code: couponCode,
-        isActive: true,
+        code: couponCode.toUpperCase(),
+        status: "active",
       }).session(session);
 
       if (!couponDoc) {
         await session.abortTransaction();
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid or expired coupon" });
-      }
-
-      const minCartValue =
-        couponDoc.minCartValue || couponDoc.discountValue * 5;
-
-      if (grossTotal < minCartValue) {
-        await session.abortTransaction();
         return res.status(400).json({
           success: false,
-          message: `Coupon '${couponDoc.code}' is applicable only on orders above ₹${minCartValue}`,
+          message: "Invalid or expired coupon",
         });
       }
 
-      appliedDiscount = couponDoc.discountValue;
+      const now = new Date();
+
+      if (couponDoc.expiryDate && new Date(couponDoc.expiryDate) < now) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: "Coupon expired",
+        });
+      }
+
+      if (couponDoc.startDate && now < new Date(couponDoc.startDate)) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: "Coupon not started yet",
+        });
+      }
+
+      if (couponDoc.minCartValue && cartTotal < couponDoc.minCartValue) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Minimum cart value ₹${couponDoc.minCartValue} required`,
+        });
+      }
+
+      // 🔥 DISCOUNT LOGIC (CORRECT)
+      if (couponDoc.type === "percent") {
+        appliedDiscount = (Number(couponDoc.value) / 100) * cartTotal;
+      } else if (couponDoc.type === "flat") {
+        appliedDiscount = Number(couponDoc.value);
+      }
+
+      appliedDiscount = Math.min(appliedDiscount, cartTotal);
+      appliedDiscount = Math.round(appliedDiscount);
+
       appliedCoupon = couponDoc.code;
-      console.log("✅ Manual coupon applied:", appliedCoupon);
     }
 
-    // ✅ Step 5 — Final total
+    // =========================
+    // ✅ Step 4: Final total
+    // =========================
     const total = Math.max(grossTotal - appliedDiscount, 0);
 
-    // ✅ Step 6 — Create order
+    // =========================
+    // ✅ Step 5: Create Order
+    // =========================
     let [order] = await Order.create(
       [
         {
@@ -181,68 +180,76 @@ export const createOrder = async (req, res) => {
       { session }
     );
 
-     // Create Payment document
-    const [payment] = await Payment.create([{
-      order: order._id,
-      mode: paymentMode || "online",
-      status: paymentMode === "cod" ? "unpaid" : "pending",
-      amount: total,
-      transactionId: paymentId || null,
-    }], { session });
+    // =========================
+    // ✅ Step 6: Payment doc
+    // =========================
+    const [payment] = await Payment.create(
+      [
+        {
+          order: order._id,
+          mode: paymentMode || "online",
+          status: paymentMode === "cod" ? "unpaid" : "pending",
+          amount: total,
+          transactionId: paymentId || null,
+        },
+      ],
+      { session }
+    );
 
-    console.log("💰 Payment document created:", payment._id);
-
-    // attach payment to order and save
     order.payment = payment._id;
     await order.save({ session });
 
-    // Remove purchased items from the user's cart (if userId present)
+    // =========================
+    // ✅ Step 7: Remove cart items
+    // =========================
     if (userId) {
       await Cart.updateOne(
         { user: userId },
         {
           $pull: {
             items: {
-              $or: selectedItems.map(s => ({
+              $or: selectedItems.map((s) => ({
                 product: s.product?._id || s.product,
                 ...(s.variantId ? { variantId: s.variantId } : {}),
-              }))
-            }
-          }
+              })),
+            },
+          },
         },
         { session }
       );
-      console.log("🗑️ Removed items from cart for user:", userId);
     }
 
-    // Mark coupon as used (if any)
+    // =========================
+    // ✅ Step 8: Mark coupon used
+    // =========================
     if (couponDoc && userId) {
       couponDoc.usedBy = couponDoc.usedBy || [];
       couponDoc.usedBy.push({ userId, orderId: order._id });
       couponDoc.usageCount = (couponDoc.usageCount || 0) + 1;
       await couponDoc.save({ session });
-      console.log(`🎟️ Coupon ${couponDoc.code} marked used by ${userId}`);
     }
 
-    // Commit once after all DB ops
     await session.commitTransaction();
 
-    // populate order for response
     order = await Order.findById(order._id)
       .populate("user", "name email phone")
       .populate("items.product")
       .populate("payment")
       .lean();
 
-    console.log("✅ Final order created successfully:", order._id);
-
-    return res.status(201).json({ success: true, data: order, message: "Order created successfully" });
+    return res.status(201).json({
+      success: true,
+      data: order,
+      message: "Order created successfully",
+    });
 
   } catch (err) {
-    // rollback on any error
     await session.abortTransaction();
     console.error("❌ Order failed:", err);
-    return res.status(400).json({ success: false, message: err.message || "Order failed" });
+    return res.status(400).json({
+      success: false,
+      message: err.message || "Order failed",
+    });
   } finally {
     session.endSession();
   }

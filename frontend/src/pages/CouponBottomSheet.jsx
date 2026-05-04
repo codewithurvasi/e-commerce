@@ -12,67 +12,66 @@ const CouponBottomSheet = ({ onClose, onApply, cartTotal }) => {
 
   useEffect(() => {
     const loadCoupons = async () => {
-  try {
-    const token = localStorage.getItem("token");
-    const localUserId = localStorage.getItem("userId");
+      try {
+        const token = localStorage.getItem("token");
+        const localUserId = localStorage.getItem("userId");
 
-    const res = await api.get("/coupons/active", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    console.log("COUPONS RESPONSE:", res.data);
+        const res = await api.get("/coupons/active", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        console.log("COUPONS RESPONSE:", res.data);
 
-    const allCoupons = res.data.coupons || [];
+        const allCoupons = res.data.coupons || [];
 
-    // ✅ frontend-only restriction
-    const filteredCoupons = allCoupons.filter((cp) => {
-      if (
-        cp.description?.toLowerCase().includes("wallet") &&
-        cp.createdBy?.toString() !== localUserId?.toString()
-      ) {
-        return false;
+        // ✅ frontend-only restriction
+        const filteredCoupons = allCoupons.filter((cp) => {
+          if (
+            cp.description?.toLowerCase().includes("wallet") &&
+            cp.createdBy?.toString() !== localUserId?.toString()
+          ) {
+            return false;
+          }
+          return cp.status === "active";
+        });
+
+        const updated = filteredCoupons.map((cp) => {
+          const now = new Date();
+          let disabled = false;
+          let reason = "";
+
+          if (
+            cp.usedBy?.some(
+              (u) => u.userId?.toString() === localUserId?.toString(),
+            )
+          ) {
+            disabled = true;
+            reason = "You have already used this coupon";
+          } else if (new Date(cp.expiryDate) < now) {
+            disabled = true;
+            reason = "This coupon has expired";
+          } else if (cp.startDate && now < new Date(cp.startDate)) {
+            disabled = true;
+            reason = `Starts on ${new Date(cp.startDate).toLocaleDateString()}`;
+          } else if (cp.maxUses > 0 && cp.uses >= cp.maxUses) {
+            disabled = true;
+            reason = "Maximum usage limit reached";
+          } else if (cartTotal < cp.minCartValue) {
+            disabled = true;
+            reason = `Add ₹${cp.minCartValue - cartTotal} more to use this coupon`;
+          }
+
+          return { ...cp, disabled, reason };
+        });
+
+        setCoupons(updated);
+      } catch (err) {
+        console.error("Error loading coupons", err);
+      } finally {
+        setLoading(false);
       }
-      return cp.status === "active";
-    });
-
-    const updated = filteredCoupons.map((cp) => {
-      const now = new Date();
-      let disabled = false;
-      let reason = "";
-
-      if (
-        cp.usedBy?.some(
-          (u) => u.userId?.toString() === localUserId?.toString()
-        )
-      ) {
-        disabled = true;
-        reason = "You have already used this coupon";
-      } else if (new Date(cp.expiryDate) < now) {
-        disabled = true;
-        reason = "This coupon has expired";
-      } else if (cp.startDate && now < new Date(cp.startDate)) {
-        disabled = true;
-        reason = `Starts on ${new Date(cp.startDate).toLocaleDateString()}`;
-      } else if (cp.maxUses > 0 && cp.uses >= cp.maxUses) {
-        disabled = true;
-        reason = "Maximum usage limit reached";
-      } else if (cartTotal < cp.minCartValue) {
-        disabled = true;
-        reason = `Add ₹${cp.minCartValue - cartTotal} more to use this coupon`;
-      }
-
-      return { ...cp, disabled, reason };
-    });
-
-    setCoupons(updated);
-  } catch (err) {
-    console.error("Error loading coupons", err);
-  } finally {
-    setLoading(false);
-  }
-};
-
+    };
 
     loadCoupons();
     console.log("AUTH USER:", user);
@@ -150,7 +149,22 @@ const CouponBottomSheet = ({ onClose, onApply, cartTotal }) => {
                   {!cp.disabled ? (
                     <button
                       onClick={() => {
-                        onApply(cp.code);
+                        let discount = 0;
+
+                        if (cp.type === "percent") {
+                          discount =
+                            (Number(cp.value) / 100) * Number(cartTotal);
+                        } else {
+                          discount = Number(cp.value);
+                        }
+
+                        discount = Math.min(discount, Number(cartTotal));
+
+                        onApply({
+                          code: cp.code,
+                          discount: Math.round(discount),
+                        });
+
                         onClose();
                       }}
                       className="h-fit self-center px-4 py-2 rounded-xl bg-green-500 text-white font-bold hover:bg-green-600 transition"

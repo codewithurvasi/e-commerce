@@ -27,7 +27,7 @@ export default function AdminCoupons() {
       setLoading(true);
       // Backend route is /api/coupons, app.use("/api/coupons", couponRoutes)
       // Inside couponRoutes, GET "/" fetches all.
-      const res = await api.get("admin/coupons");
+      const res = await api.get("/coupons/admin/all");
       setCoupons(res.data?.coupons || []);
     } catch (err) {
       console.error("Error fetching coupons", err);
@@ -43,7 +43,7 @@ export default function AdminCoupons() {
     try {
       setSubmitLoading(true);
       // ✅ MATCHED BACKEND: The endpoint is /create-coupon
-      await api.post("admin/coupons/create-coupon", form);
+      await api.post("/coupons/admin/create", form);
       toast.success("Coupon created successfully!");
       setForm({ 
         code: "", prefix: "", type: "percent", value: 0, 
@@ -62,7 +62,7 @@ export default function AdminCoupons() {
     try {
       // ✅ MATCHED BACKEND: Uses PATCH and specific /activate or /deactivate endpoints
       const action = currentStatus === 'active' ? 'deactivate' : 'activate';
-      await api.patch(`admin/coupons/${id}/${action}`);
+      await api.put(`/coupons/admin/toggle/${id}`);
       toast.success(`Coupon ${action}d successfully`);
       fetchCoupons();
     } catch (err) {
@@ -74,7 +74,7 @@ export default function AdminCoupons() {
     if (!window.confirm("Are you sure you want to delete this coupon?")) return;
     try {
       // ✅ MATCHED BACKEND: DELETE /coupons/:id
-      await api.delete(`admin/coupons/${id}`);
+      await api.delete(`/coupons/admin/delete/${id}`);
       toast.success("Coupon deleted");
       fetchCoupons();
     } catch (err) {
@@ -128,7 +128,7 @@ export default function AdminCoupons() {
               className="w-full border border-slate-200 rounded-xl px-4 h-12 text-sm font-bold bg-[var(--card-bg)] outline-none focus:ring-2 focus:ring-[#D4AF37]"
             >
               <option value="percent">Percentage (%)</option>
-              <option value="fixed">Fixed Amount (₹)</option>
+              <option value="flat">Fixed Amount (₹)</option>
             </select>
           </div>
 
@@ -161,7 +161,7 @@ export default function AdminCoupons() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block bg-black rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+      <div className="hidden md:block bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
         <table className="w-full text-left">
           <thead>
             <tr className="text-[var(--primary)] ">
@@ -178,7 +178,7 @@ export default function AdminCoupons() {
                   <span className="font-black text-slate-900 tracking-widest uppercase">{c.code}</span>
                 </td>
                 <td className="px-8 py-6 font-bold text-slate-600">
-                  {c.type === 'percent' ? `${c.value}% OFF` : `₹${c.value} OFF`}
+                 {c.type === "percent" ? `${c.value}% OFF` : `₹${c.value} OFF`}
                 </td>
                 <td className="px-8 py-6 text-center">
                   <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${

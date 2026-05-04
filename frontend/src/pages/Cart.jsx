@@ -40,6 +40,7 @@ export default function Cart() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCoupons, setShowCoupons] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -96,11 +97,11 @@ export default function Cart() {
   }, [cartItems]);
 
   const shipping = subtotal >= 50000 ? subtotal * 0.02 : subtotal * 0.05;
-  const couponDiscount = useMemo(() => {
-    if (!appliedCoupon) return 0;
-    // TEMP: backend will calculate final discount
-    return 0;
-  }, [appliedCoupon]);
+  // const couponDiscount = useMemo(() => {
+  //   if (!appliedCoupon) return 0;
+  //   // TEMP: backend will calculate final discount
+  //   return 0;
+  // }, [appliedCoupon]);
   const total = subtotal + shipping - couponDiscount;
 
   /* =========================
@@ -204,9 +205,14 @@ export default function Cart() {
       }
 
       // 4️⃣ Create Razorpay order
+      const finalPayableAmount = Math.max(0, Number(total));
+
+      console.log("UI discounted total:", finalPayableAmount);
+      console.log("Backend order total:", order.total);
+
       const paymentRes = await api.post("/payments/create", {
         orderId: order._id,
-        amount: Math.round(total * 100), // paise
+        amount: Math.round(finalPayableAmount * 100),
       });
 
       const { rzpOrderId, amount, currency, key } = paymentRes.data;
@@ -221,7 +227,7 @@ export default function Cart() {
         amount,
         currency,
         order_id: rzpOrderId,
-        name: "Petro Shop",
+        name: "WEBIX INFOTECH",
         description: "Secure Payment",
         notes: { orderId: order._id },
         prefill: {
@@ -515,6 +521,14 @@ export default function Cart() {
                       </span>
                     </div>
                   </div>
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between font-medium">
+                      <span className="text-green-600">Coupon Discount</span>
+                      <span className="text-green-600 font-semibold">
+                        -₹{couponDiscount.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between text-3xl font-black mt-6 tracking-tighter text-black">
                     <span>Total</span>
@@ -552,9 +566,10 @@ export default function Cart() {
         <CouponBottomSheet
           cartTotal={subtotal}
           onClose={() => setShowCoupons(false)}
-          onApply={(code) => {
-            setAppliedCoupon(code);
-            toast.success(`Coupon ${code} applied`);
+          onApply={(couponData) => {
+            setAppliedCoupon(couponData.code);
+            setCouponDiscount(Number(couponData.discount || 0));
+            toast.success(`Coupon ${couponData.code} applied`);
           }}
         />
       )}
